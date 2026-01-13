@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>communication-after-mid</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">Q</div>
+        <div class="brand-text">
+          <div class="brand-title">Quiz App</div>
+          <div class="brand-sub">Practice Mode</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Progress</div>
+          <div class="stat-value" id="progressText">0 / 0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Score</div>
+          <div class="stat-value" id="scoreText">0 / 0</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="card-top">
+        <div class="pill" id="pillText">Question</div>
+        <div class="bar">
+          <div class="bar-fill" id="barFill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <h2 id="question" class="question"></h2>
+
+      <p id="feedback" class="feedback"></p>
+
+      <div id="options" class="options"></div>
+
+      <div class="controls">
+        <button id="prevBtn" class="btn btn-ghost">Previous</button>
+        <button id="nextBtn" class="btn btn-primary" disabled>Next</button>
+      </div>
+    </section>
+
+    <section class="result card hidden" id="resultCard">
+      <h2 class="result-title">Result</h2>
+      <div class="result-score" id="finalScore">0 / 0</div>
+      <div class="result-meta" id="finalMeta">0%</div>
+      <button id="restartBtn" class="btn btn-primary">Restart</button>
+    </section>
+  </main>
+
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
