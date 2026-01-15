@@ -1,12 +1,21 @@
 const LS_KEY = "quiz_state_v3";
 
 /* =========================
+   أدوات مساعدة
+   ========================= */
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* =========================
    جمع كل أجزاء الأسئلة
-   questionsPart1..questionsPartN
    ========================= */
 function getPart(i) {
   try {
-    // يشتغل حتى لو الأجزاء متعرفة بـ const في questions.js
     return eval(`typeof questionsPart${i} !== "undefined" ? questionsPart${i} : undefined`);
   } catch (e) {
     return undefined;
@@ -17,7 +26,6 @@ function buildQuestions() {
   const all = [];
   let misses = 0;
 
-  // هنمشي من 1 لحد ما نلاقي عدد كبير من أجزاء مش موجودة متتالية
   for (let i = 1; i <= 5000; i++) {
     const part = getPart(i);
 
@@ -26,24 +34,19 @@ function buildQuestions() {
       misses = 0;
     } else {
       misses++;
-      if (misses >= 50) break; // لو 50 جزء ورا بعض مش موجودين نوقف
+      if (misses >= 50) break;
     }
   }
-
-  // ترتيب حسب id
-  all.sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0));
 
   return all;
 }
 
-const questions = buildQuestions();
-console.log("TOTAL QUESTIONS =", questions.length);
-
 /* =========================
    الحالة
    ========================= */
+let questions = [];
 let currentQuestion = 0;
-let answers = []; // answers[index] = { selected: string, correct: boolean }
+let answers = [];
 let score = 0;
 
 /* =========================
@@ -68,40 +71,39 @@ function recomputeScore() {
 }
 
 function saveState() {
-  try {
-    localStorage.setItem(
-      LS_KEY,
-      JSON.stringify({
-        currentQuestion,
-        answers,
-        score
-      })
-    );
-  } catch (e) {}
+  localStorage.setItem(
+    LS_KEY,
+    JSON.stringify({
+      questions,
+      currentQuestion,
+      answers
+    })
+  );
 }
 
 function loadState() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) {
+    questions = shuffleArray(buildQuestions());
+    return;
+  }
 
-    const data = JSON.parse(raw);
-    if (typeof data.currentQuestion === "number") currentQuestion = data.currentQuestion;
-    if (Array.isArray(data.answers)) answers = data.answers;
+  const data = JSON.parse(raw);
 
-    recomputeScore();
+  if (Array.isArray(data.questions)) {
+    questions = data.questions;
+  } else {
+    questions = shuffleArray(buildQuestions());
+  }
 
-    // لو المؤشر خارج عدد الأسئلة (مثلاً ملف الأسئلة اتغير)
-    if (currentQuestion < 0 || currentQuestion >= questions.length) {
-      currentQuestion = 0;
-      answers = [];
-      recomputeScore();
-      saveState();
-    }
-  } catch (e) {}
+  currentQuestion = data.currentQuestion || 0;
+  answers = data.answers || [];
+
+  recomputeScore();
 }
 
 function resetQuiz() {
+  questions = shuffleArray(buildQuestions());
   currentQuestion = 0;
   answers = [];
   score = 0;
@@ -115,18 +117,12 @@ function updateHeader() {
   const total = questions.length;
   const idx = currentQuestion + 1;
 
-  if (progressTextEl) progressTextEl.innerText = `${idx} / ${total}`;
-  if (scoreTextEl) scoreTextEl.innerText = `${score} / ${total}`;
-  if (pillTextEl) pillTextEl.innerText = `Question ${idx}`;
+  progressTextEl.innerText = `${idx} / ${total}`;
+  scoreTextEl.innerText = `${score} / ${total}`;
+  pillTextEl.innerText = `Question ${idx}`;
 
-  if (barFillEl) {
-    const pct = total ? Math.round((idx / total) * 100) : 0;
-    barFillEl.style.width = `${pct}%`;
-  }
-}
-
-function clearFeedback() {
-  if (feedbackEl) feedbackEl.innerText = "";
+  const pct = total ? Math.round((idx / total) * 100) : 0;
+  barFillEl.style.width = `${pct}%`;
 }
 
 function lockOptions(disabled) {
@@ -134,27 +130,35 @@ function lockOptions(disabled) {
 }
 
 function renderQuestion() {
-  if (!questions.length) {
-    if (questionEl) questionEl.innerText = "No questions found in questions.js";
-    if (optionsEl) optionsEl.innerHTML = "";
-    if (nextBtn) nextBtn.disabled = true;
-    if (prevBtn) prevBtn.disabled = true;
-    if (feedbackEl) feedbackEl.innerText = "";
-    return;
-  }
+  if (!questions.length) return;
 
   const q = questions[currentQuestion];
-
   updateHeader();
-  clearFeedback();
 
   questionEl.innerText = q.question;
   optionsEl.innerHTML = "";
+  feedbackEl.innerText = "";
+
+  const savedAnswer = answers[currentQuestion];
 
   (q.options || []).forEach(opt => {
     const btn = document.createElement("button");
     btn.innerText = opt;
-    btn.onclick = () => handleAnswer(btn, opt);
+
+    if (savedAnswer) {
+      btn.disabled = true;
+
+      if (opt === savedAnswer.selected) {
+        btn.classList.add(savedAnswer.correct ? "correct" : "wrong");
+      }
+
+      if (!savedAnswer.correct && opt === q.answer) {
+        btn.classList.add("correct");
+      }
+    } else {
+      btn.onclick = () => handleAnswer(btn, opt);
+    }
+
     optionsEl.appendChild(btn);
   });
 
@@ -168,43 +172,26 @@ function renderQuestion() {
    الإجابة
    ========================= */
 function handleAnswer(button, selected) {
-  const correct = questions[currentQuestion].answer;
-
+  const correctAnswer = questions[currentQuestion].answer;
   lockOptions(true);
 
-  if (selected === correct) {
+  const isCorrect = selected === correctAnswer;
+  answers[currentQuestion] = { selected, correct: isCorrect };
+
+  recomputeScore();
+  updateHeader();
+  saveState();
+
+  if (isCorrect) {
     button.classList.add("correct");
-
-    answers[currentQuestion] = { selected, correct: true };
-    recomputeScore();
-    updateHeader();
-    saveState();
-
-    setTimeout(() => {
-      goNext();
-    }, 600);
+    setTimeout(goNext, 600);
   } else {
     button.classList.add("wrong");
-
-    answers[currentQuestion] = { selected, correct: false };
-    recomputeScore();
-    updateHeader();
-    saveState();
-
-    if (feedbackEl) feedbackEl.innerText = `Correct Answer: ${correct}`;
+    feedbackEl.innerText = `Correct Answer: ${correctAnswer}`;
 
     [...optionsEl.children].forEach(b => {
-      if (b.innerText === correct) b.classList.add("correct");
+      if (b.innerText === correctAnswer) b.classList.add("correct");
     });
-
-    setTimeout(() => {
-      [...optionsEl.children].forEach(b => {
-        b.disabled = false;
-        b.classList.remove("wrong", "correct");
-      });
-      clearFeedback();
-      saveState();
-    }, 1500);
   }
 }
 
@@ -212,14 +199,11 @@ function handleAnswer(button, selected) {
    تنقل
    ========================= */
 function goNext() {
-  // لو آخر سؤال: ابدأ من الأول (Reset كامل)
   if (currentQuestion >= questions.length - 1) {
     resetQuiz();
-    renderQuestion();
-    return;
+  } else {
+    currentQuestion++;
   }
-
-  currentQuestion++;
   saveState();
   renderQuestion();
 }
@@ -235,8 +219,8 @@ function goPrev() {
 /* =========================
    تشغيل
    ========================= */
-if (nextBtn) nextBtn.onclick = goNext;
-if (prevBtn) prevBtn.onclick = goPrev;
+nextBtn.onclick = goNext;
+prevBtn.onclick = goPrev;
 
 loadState();
 renderQuestion();
